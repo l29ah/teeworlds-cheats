@@ -11,6 +11,8 @@ public:
 	vec2 m_MousePos;
 	vec2 m_TargetPos;
 
+	int m_AmmoCount[NUM_WEAPONS];
+
 	CNetObj_PlayerInput m_InputData;
 	CNetObj_PlayerInput m_LastData;
 	int m_InputDirectionLeft;

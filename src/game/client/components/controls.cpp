@@ -20,6 +20,8 @@ CControls::CControls()
 
 void CControls::OnReset()
 {
+	for( int i = 0; i < NUM_WEAPONS; i++ )
+		m_AmmoCount[i] = 0;
 	m_LastData.m_Direction = 0;
 	m_LastData.m_Hook = 0;
 	// simulate releasing the fire button
@@ -42,6 +44,8 @@ void CControls::OnPlayerDeath()
 {
 	if(!m_pClient->m_Snap.m_pGameDataRace || !(m_pClient->m_Snap.m_pGameDataRace->m_RaceFlags&RACEFLAG_KEEP_WANTED_WEAPON))
 		m_LastData.m_WantedWeapon = m_InputData.m_WantedWeapon = 0;
+	for( int i = 0; i < NUM_WEAPONS; i++ )
+		m_AmmoCount[i] = 0;
 }
 
 static void ConKeyInputState(IConsole::IResult *pResult, void *pUserData)
@@ -104,6 +108,8 @@ void CControls::OnMessage(int Msg, void *pRawMsg)
 		CNetMsg_Sv_WeaponPickup *pMsg = (CNetMsg_Sv_WeaponPickup *)pRawMsg;
 		if(Config()->m_ClAutoswitchWeapons)
 			m_InputData.m_WantedWeapon = pMsg->m_Weapon+1;
+		// We don't really know ammo count, until we'll switch to that weapon, but any non-zero count will suffice here
+		m_AmmoCount[pMsg->m_Weapon%NUM_WEAPONS] = 10;
 	}
 }
 
@@ -197,6 +203,29 @@ int CControls::SnapInput(int *pData)
 void CControls::OnRender()
 {
 	ClampMousePos();
+
+	if (m_pClient->m_Snap.m_pLocalCharacter)
+	{
+		// Keep track of ammo count, we know weapon ammo only when we switch to that weapon, this is tracked on server and protocol does not track that
+		m_AmmoCount[m_pClient->m_Snap.m_pLocalCharacter->m_Weapon%NUM_WEAPONS] = m_pClient->m_Snap.m_pLocalCharacter->m_AmmoCount;
+		// Autoswitch weapon if we're out of ammo
+		if( (m_InputData.m_Fire % 2 != 0) &&
+			m_pClient->m_Snap.m_pLocalCharacter->m_AmmoCount == 0 &&
+			m_pClient->m_Snap.m_pLocalCharacter->m_Weapon != WEAPON_HAMMER &&
+			m_pClient->m_Snap.m_pLocalCharacter->m_Weapon != WEAPON_NINJA )
+		{
+			int w;
+			for( w = WEAPON_LASER; w > WEAPON_GUN; w-- )
+			{
+				if( w == m_pClient->m_Snap.m_pLocalCharacter->m_Weapon )
+					continue;
+				if( m_AmmoCount[w] > 0 )
+					break;
+			}
+			if( w != m_pClient->m_Snap.m_pLocalCharacter->m_Weapon )
+				m_InputData.m_WantedWeapon = w+1;
+		}
+	}
 
 	// update target pos
 	if(m_pClient->m_Snap.m_pGameData && !m_pClient->m_Snap.m_SpecInfo.m_Active)
